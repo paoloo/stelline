@@ -1,6 +1,5 @@
 #include <cassert>
 #include <cstring>
-#include <sys/stat.h>
 
 #include <hdf5.h>
 
@@ -11,10 +10,6 @@
 
 #include <matx.h>
 #include <cuda/std/complex>
-
-extern "C" {
-#include "filterbankc99.h"
-}
 
 using namespace holoscan;
 

@@ -12,10 +12,6 @@
 #include <matx.h>
 #include <cuda/std/complex>
 
-extern "C" {
-#include "uvh5.h"
-}
-
 using namespace holoscan;
 
 namespace stelline::operators::filesystem {
