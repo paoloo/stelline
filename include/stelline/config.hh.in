@@ -17,6 +17,8 @@
 #mesondefine STELLINE_LOADER_HDF5
 #mesondefine STELLINE_LOADER_FBH5
 #mesondefine STELLINE_LOADER_UVH5
+#mesondefine STELLINE_LOADER_FBH5_READ
+#mesondefine STELLINE_LOADER_UVH5_READ
 
 //
 // Operators

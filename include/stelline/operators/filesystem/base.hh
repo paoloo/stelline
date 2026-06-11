@@ -137,6 +137,58 @@ class STELLINE_API Uvh5WriterRdmaOp : public Operator,
 };
 #endif  // STELLINE_LOADER_UVH5
 
+#ifdef STELLINE_LOADER_FBH5_READ
+class STELLINE_API Fbh5ReaderOp : public Operator,
+                                  public stelline::Context {
+ public:
+    HOLOSCAN_OPERATOR_FORWARD_ARGS(Fbh5ReaderOp)
+
+    ~Fbh5ReaderOp();
+
+    void initialize() override;
+    void setup(OperatorSpec& spec) override;
+    void start() override;
+    void stop() override;
+    void compute(InputContext& input, OutputContext& output, ExecutionContext& context) override;
+
+    void tick() override;
+    std::string formatMetrics(const MetricsProvider::MetricsMap& metrics) override;
+
+ private:
+    struct Impl;
+    Impl* pimpl = nullptr;
+
+    Parameter<std::string> filePath_;
+    Parameter<uint64_t> chunkSize_;
+};
+#endif  // STELLINE_LOADER_FBH5_READ
+
+#ifdef STELLINE_LOADER_UVH5_READ
+class STELLINE_API Uvh5ReaderOp : public Operator,
+                                  public stelline::Context {
+ public:
+    HOLOSCAN_OPERATOR_FORWARD_ARGS(Uvh5ReaderOp)
+
+    ~Uvh5ReaderOp();
+
+    void initialize() override;
+    void setup(OperatorSpec& spec) override;
+    void start() override;
+    void stop() override;
+    void compute(InputContext& input, OutputContext& output, ExecutionContext& context) override;
+
+    void tick() override;
+    std::string formatMetrics(const MetricsProvider::MetricsMap& metrics) override;
+
+ private:
+    struct Impl;
+    Impl* pimpl = nullptr;
+
+    Parameter<std::string> filePath_;
+    Parameter<uint64_t> chunkSize_;
+};
+#endif  // STELLINE_LOADER_UVH5_READ
+
 }  // namespace stelline::operators::filesystem
 
 #endif  // STELLINE_OPERATORS_FILESYSTEM_BASE_HH

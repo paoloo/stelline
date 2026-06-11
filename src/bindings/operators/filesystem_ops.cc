@@ -100,6 +100,50 @@ public:
 };
 #endif
 
+#ifdef STELLINE_LOADER_FBH5_READ
+class PyFbh5ReaderOp : public Fbh5ReaderOp {
+public:
+    using Fbh5ReaderOp::Fbh5ReaderOp;
+
+    PyFbh5ReaderOp(Fragment* fragment,
+                   const py::args& args,
+                   const std::string& file_path,
+                   const uint64_t chunk_size = 8192,
+                   const std::string& name = "fbh5_reader")
+        : Fbh5ReaderOp(ArgList{
+            Arg("file_path", file_path),
+            Arg("chunk_size", chunk_size)
+        }) {
+        name_ = name;
+        fragment_ = fragment;
+        spec_ = std::make_shared<OperatorSpec>(fragment);
+        setup(*spec_.get());
+    }
+};
+#endif
+
+#ifdef STELLINE_LOADER_UVH5_READ
+class PyUvh5ReaderOp : public Uvh5ReaderOp {
+public:
+    using Uvh5ReaderOp::Uvh5ReaderOp;
+
+    PyUvh5ReaderOp(Fragment* fragment,
+                   const py::args& args,
+                   const std::string& file_path,
+                   const uint64_t chunk_size = 1,
+                   const std::string& name = "uvh5_reader")
+        : Uvh5ReaderOp(ArgList{
+            Arg("file_path", file_path),
+            Arg("chunk_size", chunk_size)
+        }) {
+        name_ = name;
+        fragment_ = fragment;
+        spec_ = std::make_shared<OperatorSpec>(fragment);
+        setup(*spec_.get());
+    }
+};
+#endif
+
 PYBIND11_MODULE(_filesystem_ops, m) {
     m.doc() = "Stelline filesystem operators module";
 
@@ -166,5 +210,35 @@ PYBIND11_MODULE(_filesystem_ops, m) {
         .def("set_metrics_provider", &Uvh5WriterRdmaOp::setMetricsProvider)
         .def_property_readonly("manifest", &Uvh5WriterRdmaOp::manifest, py::return_value_policy::reference)
         .def_property_readonly("metrics", &Uvh5WriterRdmaOp::metrics, py::return_value_policy::reference);
+#endif
+
+#ifdef STELLINE_LOADER_FBH5_READ
+    py::class_<Fbh5ReaderOp, PyFbh5ReaderOp, Operator, std::shared_ptr<Fbh5ReaderOp>>(m, "Fbh5ReaderOp")
+        .def(py::init<Fragment*, const py::args&, const std::string&, const uint64_t, const std::string&>(),
+             py::arg("fragment"),
+             py::arg("file_path"),
+             py::arg("chunk_size") = static_cast<uint64_t>(8192),
+             py::arg("name") = "fbh5_reader")
+        .def("tick", &Fbh5ReaderOp::tick)
+        .def("format_metrics", &Fbh5ReaderOp::formatMetrics)
+        .def("set_manifest_provider", &Fbh5ReaderOp::setManifestProvider)
+        .def("set_metrics_provider", &Fbh5ReaderOp::setMetricsProvider)
+        .def_property_readonly("manifest", &Fbh5ReaderOp::manifest, py::return_value_policy::reference)
+        .def_property_readonly("metrics", &Fbh5ReaderOp::metrics, py::return_value_policy::reference);
+#endif
+
+#ifdef STELLINE_LOADER_UVH5_READ
+    py::class_<Uvh5ReaderOp, PyUvh5ReaderOp, Operator, std::shared_ptr<Uvh5ReaderOp>>(m, "Uvh5ReaderOp")
+        .def(py::init<Fragment*, const py::args&, const std::string&, const uint64_t, const std::string&>(),
+             py::arg("fragment"),
+             py::arg("file_path"),
+             py::arg("chunk_size") = static_cast<uint64_t>(1),
+             py::arg("name") = "uvh5_reader")
+        .def("tick", &Uvh5ReaderOp::tick)
+        .def("format_metrics", &Uvh5ReaderOp::formatMetrics)
+        .def("set_manifest_provider", &Uvh5ReaderOp::setManifestProvider)
+        .def("set_metrics_provider", &Uvh5ReaderOp::setMetricsProvider)
+        .def_property_readonly("manifest", &Uvh5ReaderOp::manifest, py::return_value_policy::reference)
+        .def_property_readonly("metrics", &Uvh5ReaderOp::metrics, py::return_value_policy::reference);
 #endif
 }

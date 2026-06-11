@@ -32,5 +32,31 @@ if basic_deps_found and (fbh5_dep_found or uvh5_dep_found)
     endif
 endif
 
+# Reader path: plain HDF5 only — no GDS VFD required.
+# Enables FBH5/UVH5 readers on any CUDA system (including non-NVMe/non-GPUDirect).
+plain_hdf5_dep = dependency('hdf5', required: false)
+fbh5_read_found = plain_hdf5_dep.found() and fbh5_dep_found
+uvh5_read_found = plain_hdf5_dep.found() and uvh5_dep_found
+
+if (fbh5_read_found or uvh5_read_found) and not basic_deps_found
+    # GDS path not available: add plain HDF5 and format deps explicitly.
+    dep_lst += [plain_hdf5_dep]
+    if fbh5_read_found
+        dep_lst += [fbh5_dep]
+    endif
+    if uvh5_read_found
+        dep_lst += [uvh5_dep]
+    endif
+endif
+
+if fbh5_read_found
+    cfg_lst.set('STELLINE_LOADER_FBH5_READ', true)
+endif
+if uvh5_read_found
+    cfg_lst.set('STELLINE_LOADER_UVH5_READ', true)
+endif
+
 ldr_lst += {'FBH5': basic_deps_found and fbh5_dep_found}
 ldr_lst += {'UVH5': basic_deps_found and uvh5_dep_found}
+ldr_lst += {'FBH5 Reader': fbh5_read_found}
+ldr_lst += {'UVH5 Reader': uvh5_read_found}

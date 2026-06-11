@@ -29,4 +29,16 @@ if cfg_lst.get('STELLINE_LOADER_UVH5', false)
     ])
 endif
 
+if cfg_lst.get('STELLINE_LOADER_FBH5_READ', false)
+    src_lst += files([
+        'fbh5_reader.cc',
+    ])
+endif
+
+if cfg_lst.get('STELLINE_LOADER_UVH5_READ', false)
+    src_lst += files([
+        'uvh5_reader.cc',
+    ])
+endif
+
 operator_lst += {'Filesystem': all_deps_found}

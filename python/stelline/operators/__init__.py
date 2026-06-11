@@ -6,6 +6,8 @@ from stelline.operators._filesystem_ops import (
     SimpleWriterRdmaOp,
     Fbh5WriterRdmaOp,
     Uvh5WriterRdmaOp,
+    Fbh5ReaderOp,
+    Uvh5ReaderOp,
 )
 
 from stelline.operators._transport_ops import AtaReceiverOp, SorterOp, DummyReceiverOp
@@ -28,6 +30,8 @@ __all__ = [
     "SimpleWriterRdmaOp",
     "Fbh5WriterRdmaOp",
     "Uvh5WriterRdmaOp",
+    "Fbh5ReaderOp",
+    "Uvh5ReaderOp",
     "AtaReceiverOp",
     "SorterOp",
     "DummyReceiverOp",

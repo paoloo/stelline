@@ -37,13 +37,12 @@
 }
 #endif  // GDS_CHECK_THROW
 
-#ifdef STELLINE_LOADER_HDF5
+#if defined(STELLINE_LOADER_HDF5) || defined(STELLINE_LOADER_FBH5_READ) || defined(STELLINE_LOADER_UVH5_READ)
 //
-// HDF
+// HDF5 (plain — no GDS VFD required)
 //
 
 #include <hdf5.h>
-#include <H5FDgds.h>
 
 #ifndef HDF5_CHECK_THROW
 #define HDF5_CHECK_THROW(f, callback) { \
@@ -55,6 +54,11 @@
     } \
 }
 #endif  // HDF5_CHECK_THROW
+#endif  // STELLINE_LOADER_HDF5 || STELLINE_LOADER_FBH5_READ || STELLINE_LOADER_UVH5_READ
+
+#ifdef STELLINE_LOADER_HDF5
+// GDS VFD — only on NVIDIA systems with GPUDirect Storage.
+#include <H5FDgds.h>
 #endif  // STELLINE_LOADER_HDF5
 
 #endif  // STELLINE_OPERATORS_FILESYSTEM_HELPERS_HH
