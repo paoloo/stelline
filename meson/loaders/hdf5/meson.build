@@ -34,13 +34,18 @@ endif
 
 # Reader path: plain HDF5 only — no GDS VFD required.
 # Enables FBH5/UVH5 readers on any CUDA system (including non-NVMe/non-GPUDirect).
-plain_hdf5_dep = dependency('hdf5', required: false)
-fbh5_read_found = plain_hdf5_dep.found() and fbh5_dep_found
-uvh5_read_found = plain_hdf5_dep.found() and uvh5_dep_found
+#
+# Use h5dsc99 as the HDF5 availability proxy instead of dependency('hdf5').
+# Meson's hdf5.py looks up the C compiler (coredata.compilers['c']) which
+# raises KeyError on projects that only declare C++ and CUDA languages.
+# h5dsc99 is already detected above, requires HDF5, and avoids that code path.
+h5dsc99_probe = dependency('h5dsc99', required: false)  # cached — no re-probe
+fbh5_read_found = h5dsc99_probe.found() and fbh5_dep_found
+uvh5_read_found = h5dsc99_probe.found() and uvh5_dep_found
 
 if (fbh5_read_found or uvh5_read_found) and not basic_deps_found
-    # GDS path not available: add plain HDF5 and format deps explicitly.
-    dep_lst += [plain_hdf5_dep]
+    # GDS path not available: add h5dsc99 (brings in HDF5) and format deps.
+    dep_lst += [h5dsc99_probe]
     if fbh5_read_found
         dep_lst += [fbh5_dep]
     endif
