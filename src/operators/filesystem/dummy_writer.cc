@@ -54,10 +54,12 @@ void DummyWriterOp::compute(InputContext& input, OutputContext&, ExecutionContex
 
     input.receive<std::shared_ptr<holoscan::Tensor>>("in");
 
-    // Log latest timestamp.
+    // Log latest timestamp (optional — not all source operators emit it).
 
     const auto& meta = metadata();
-    pimpl->latestTimestamp = meta->get<uint64_t>("timestamp");
+    if (meta->has_key("timestamp")) {
+        pimpl->latestTimestamp = meta->get<uint64_t>("timestamp");
+    }
 
     // Increment iteration counter.
 

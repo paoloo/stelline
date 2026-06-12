@@ -106,7 +106,7 @@ void Uvh5ReaderOp::setup(OperatorSpec& spec) {
                    holoscan::Arg("capacity", 1024UL));
 
     spec.param(filePath_, "file_path");
-    spec.param(chunkSize_, "chunk_size", "chunk_size", static_cast<uint64_t>(1));
+    spec.param(chunkSize_, "chunk_size");
 }
 
 void Uvh5ReaderOp::start() {
@@ -313,6 +313,7 @@ void Uvh5ReaderOp::compute(InputContext&, OutputContext& output, ExecutionContex
     // Propagate the JD timestamp as metadata so downstream operators can use it.
     const auto& meta = metadata();
     meta->set("timestamp_jd", firstTimestamp);
+    meta->set("timestamp", pimpl->chunkCounter);
 
     output.emit(pimpl->outputTensor, "out");
 }
