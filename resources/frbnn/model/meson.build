@@ -12,6 +12,12 @@ foreach model : models
 
     if not fs.exists(onnx_filename)
         run_command(curl, '-L', '-o', onnx_filename, url, check: true)
+        if onnx_filename == 'frbnn_preprocessor.onnx'
+            python = find_program('python3', required: false)
+            if python.found()
+                run_command(python, 'patch_preprocessor.py', check: false)
+            endif
+        endif
     else
         message('Model file `@0@` already exists. Skipping download.'.format(onnx_filename))
     endif
