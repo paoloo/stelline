@@ -31,6 +31,7 @@ subdir('meson')
 subdir('src')
 subdir('resources')
 subdir('include')
+subdir('tests')
 
 lib_stelline = library(
     'stelline',

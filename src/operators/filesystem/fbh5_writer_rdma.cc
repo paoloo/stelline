@@ -131,7 +131,9 @@ void Fbh5WriterRdmaOp::start() {
 
     // Create HDF5 file.
 
-    HDF5_CHECK_THROW(filterbank_h5_open_explicit(pimpl->filePath.data(), &pimpl->fbh5_file, H5Tcopy(H5T_IEEE_F64LE), pimpl->faplId), [&]{
+    // FBH5 stores power samples as 32-bit floats; keep the on-disk type and
+    // header metadata aligned so filterbankc99 reads the file back correctly.
+    HDF5_CHECK_THROW(filterbank_h5_open_explicit(pimpl->filePath.data(), &pimpl->fbh5_file, H5Tcopy(H5T_IEEE_F32LE), pimpl->faplId), [&]{
         HOLOSCAN_LOG_ERROR("Error opening FBH5 file.");
     });
 
