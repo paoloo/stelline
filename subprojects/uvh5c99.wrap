@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://github.com/MydonSolutions/uvh5c99
+revision = read
+depth = 2
+
+[provide]
+uvh5c99 = lib_uvh5c99_dep 

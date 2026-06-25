@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://github.com/MydonSolutions/filterbankc99
+revision = h5_read
+depth = 1
+
+[provide]
+filterbankc99 = lib_filterbankc99_dep 

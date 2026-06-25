@@ -2,7 +2,11 @@
 #include <cstring>
 
 #include <hdf5.h>
-
+extern "C" {
+#include "filterbankc99.h"
+#include "h5dsc99/h5_dataspace.h"
+}
+ 
 #include <stelline/types.hh>
 #include <stelline/operators/filesystem/base.hh>
 #include <stelline/utils/tensor.hh>
@@ -24,21 +28,8 @@ struct Fbh5ReaderOp::Impl {
     std::string filePath;
     hsize_t chunkSize;
 
-    // HDF5 state.
-
-    hid_t fileId;
-    hid_t datasetId;
-    hid_t dataspaceId;
-
-    // Data dimensions read from the file.
-    // Dataset layout: [ntimes, nifs, nchans]  (standard filterbank HDF5)
-
-    hsize_t dims[3];
-    int ndims;
-
-    // Current read position (first-dimension index).
-
-    hsize_t readOffset;
+    // FBH5 state.
+    filterbank_h5_file_t fbh5;
 
     // CPU pinned bounce buffer and CUDA stream for H→D transfer.
 
@@ -85,54 +76,42 @@ void Fbh5ReaderOp::start() {
     H5Eset_auto(H5E_DEFAULT, nullptr, nullptr);
 
     // Open the file read-only with the default (POSIX) VFD — no GDS required.
-    pimpl->fileId = H5Fopen(pimpl->filePath.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-    if (pimpl->fileId < 0) {
+    pimpl->fbh5 = filterbank_h5_access_file_explicit(
+        pimpl->filePath.c_str(),
+        H5P_DEFAULT
+    );
+    if (pimpl->fbh5.fileId == H5I_INVALID_HID) {
         HOLOSCAN_LOG_ERROR("FBH5 Reader: cannot open '{}'.", pimpl->filePath);
         throw std::runtime_error(fmt::format("FBH5 Reader: cannot open '{}'.", pimpl->filePath));
     }
-
-    pimpl->datasetId = H5Dopen2(pimpl->fileId, FBH5_DATA_DATASET, H5P_DEFAULT);
-    if (pimpl->datasetId < 0) {
-        HOLOSCAN_LOG_ERROR("FBH5 Reader: dataset '{}' not found in '{}'.", FBH5_DATA_DATASET, pimpl->filePath);
-        H5Fclose(pimpl->fileId);
-        throw std::runtime_error("FBH5 Reader: dataset not found.");
-    }
-
-    pimpl->dataspaceId = H5Dget_space(pimpl->datasetId);
-    pimpl->ndims = H5Sget_simple_extent_ndims(pimpl->dataspaceId);
-
-    if (pimpl->ndims < 1 || pimpl->ndims > 3) {
-        HOLOSCAN_LOG_ERROR("FBH5 Reader: unexpected dataset rank {} (expected 1–3).", pimpl->ndims);
-        H5Sclose(pimpl->dataspaceId);
-        H5Dclose(pimpl->datasetId);
-        H5Fclose(pimpl->fileId);
-        throw std::runtime_error("FBH5 Reader: unexpected dataset rank.");
-    }
-
-    // Fill dims[]; pad missing trailing dims with 1.
-    std::fill(pimpl->dims, pimpl->dims + 3, static_cast<hsize_t>(1));
-    H5Sget_simple_extent_dims(pimpl->dataspaceId, pimpl->dims, nullptr);
-
-    HOLOSCAN_LOG_INFO("FBH5 Reader: opened '{}' — dims=[{},{},{}], chunk_size={}.",
+    
+    filterbank_h5_change_access_chunking(
+        &pimpl->fbh5,
+        pimpl->chunkSize, // nof time indices
+        0, // shorthand for all IF
+        0 // shorthand for all chans
+    );
+    filterbank_h5_alloc(&pimpl->fbh5);
+    HOLOSCAN_LOG_INFO("FBH5 Reader: opened '{}' — dim_chunks=[{}/{},{},{}].",
                       pimpl->filePath,
-                      pimpl->dims[0], pimpl->dims[1], pimpl->dims[2],
-                      pimpl->chunkSize);
+                      pimpl->chunkSize,
+                      pimpl->fbh5.ds_data.dims[0], pimpl->fbh5.ds_data.dims[1], pimpl->fbh5.ds_data.dims[2],
+                      );
 
     // Bounce buffer: one chunk's worth of float32 samples.
-    pimpl->bounceBufferBytes = pimpl->chunkSize * pimpl->dims[1] * pimpl->dims[2] * sizeof(float);
+    pimpl->bounceBufferBytes = H5DSsize(&pimpl->fbh5.ds_data);
     if (cudaMallocHost(&pimpl->bounceBuffer, pimpl->bounceBufferBytes) != cudaSuccess) {
         HOLOSCAN_LOG_ERROR("FBH5 Reader: failed to allocate pinned bounce buffer.");
-        H5Sclose(pimpl->dataspaceId);
-        H5Dclose(pimpl->datasetId);
-        H5Fclose(pimpl->fileId);
+        filterbank_h5_free(&pimpl->fbh5);
+        filterbank_h5_close(&pimpl->fbh5);
         throw std::runtime_error("FBH5 Reader: bounce buffer allocation failed.");
     }
 
     // GPU output tensor: [chunk_size, nifs, nchans].
     auto t = matx::make_tensor<float>(
-        {static_cast<matx::index_t>(pimpl->chunkSize),
-         static_cast<matx::index_t>(pimpl->dims[1]),
-         static_cast<matx::index_t>(pimpl->dims[2])},
+        {static_cast<matx::index_t>(pimpl->fbh5.ds_data.dimchunks[0]),
+         static_cast<matx::index_t>(pimpl->fbh5.ds_data.dimchunks[1]),
+         static_cast<matx::index_t>(pimpl->fbh5.ds_data.dimchunks[2])},
         matx::MATX_DEVICE_MEMORY);
     pimpl->outputTensor = std::make_shared<holoscan::Tensor>(t.ToDlPack());
 
@@ -154,47 +133,21 @@ void Fbh5ReaderOp::stop() {
         pimpl->bounceBuffer = nullptr;
     }
 
-    if (pimpl->dataspaceId >= 0) {
-        H5Sclose(pimpl->dataspaceId);
-    }
-    if (pimpl->datasetId >= 0) {
-        H5Dclose(pimpl->datasetId);
-    }
-    if (pimpl->fileId >= 0) {
-        H5Fclose(pimpl->fileId);
+    if (pimpl->fbh5.ds_data.D_id >= 0) {
+        filterbank_h5_free(&fbh5);
+        filterbank_h5_close(&fbh5);
     }
 }
 
 void Fbh5ReaderOp::compute(InputContext&, OutputContext& output, ExecutionContext&) {
-    const hsize_t totalTimes = pimpl->dims[0];
-
-    // Wrap around when fewer samples remain than a full chunk.
-    if (pimpl->readOffset + pimpl->chunkSize > totalTimes) {
-        pimpl->readOffset = 0;
-        HOLOSCAN_LOG_INFO("FBH5 Reader: looping back to start of '{}'.", pimpl->filePath);
-    }
-
-    // Select hyperslab: [readOffset, 0, 0] with count [chunkSize, nifs, nchans].
-    const hsize_t offset[3] = {pimpl->readOffset, 0, 0};
-    const hsize_t count[3]  = {pimpl->chunkSize, pimpl->dims[1], pimpl->dims[2]};
-
-    herr_t status = H5Sselect_hyperslab(pimpl->dataspaceId,
-                                         H5S_SELECT_SET,
-                                         offset, nullptr, count, nullptr);
-    if (status < 0) {
-        HOLOSCAN_LOG_ERROR("FBH5 Reader: H5Sselect_hyperslab failed.");
-        throw std::runtime_error("FBH5 Reader: hyperslab selection failed.");
-    }
-
-    hid_t memspace = H5Screate_simple(pimpl->ndims, count, nullptr);
-    status = H5Dread(pimpl->datasetId, H5T_NATIVE_FLOAT,
-                     memspace, pimpl->dataspaceId,
-                     H5P_DEFAULT, pimpl->bounceBuffer);
-    H5Sclose(memspace);
-
+    pimpl->readOffset = pimpl->fbh5.ds_data.hyperslab_start[0];
+    herr_t status = filterbank_h5_read(&pimpl->fbh5);
     if (status < 0) {
         HOLOSCAN_LOG_ERROR("FBH5 Reader: H5Dread failed at offset {}.", pimpl->readOffset);
         throw std::runtime_error("FBH5 Reader: H5Dread failed.");
+    }
+    else if (status == 1) {
+        HOLOSCAN_LOG_INFO("FBH5 Reader: looping back to start of '{}'.", pimpl->filePath);
     }
 
     // Copy CPU → GPU asynchronously then synchronise before emit.
@@ -205,7 +158,6 @@ void Fbh5ReaderOp::compute(InputContext&, OutputContext& output, ExecutionContex
                     pimpl->stream);
     cudaStreamSynchronize(pimpl->stream);
 
-    pimpl->readOffset += pimpl->chunkSize;
     pimpl->totalBytesRead += static_cast<int64_t>(pimpl->bounceBufferBytes);
     pimpl->bytesSinceLastMeasurement += static_cast<int64_t>(pimpl->bounceBufferBytes);
     pimpl->chunkCounter++;

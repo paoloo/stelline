@@ -13,9 +13,9 @@ foreach x_dep : deps
     basic_deps_found = basic_deps_found and x_dep.found()
 endforeach
 
-fbh5_dep = dependency('filterbankc99', required: false)
+fbh5_dep = dependency('filterbankc99', version: '>= 1.6.0', required: false)
 fbh5_dep_found = fbh5_dep.found()
-uvh5_dep = dependency('uvh5c99', version: '>= 0.9.0', required: false)
+uvh5_dep = dependency('uvh5c99', version: '>= 1.0.0', required: false)
 uvh5_dep_found = uvh5_dep.found()
 
 if basic_deps_found and (fbh5_dep_found or uvh5_dep_found)
